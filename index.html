@@ -1,0 +1,332 @@
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no" />
+  <title>Ionic Split Pane Map Example</title>
+
+  <!-- Ionic Framework -->
+  <script type="module" src="https://cdn.jsdelivr.net/npm/@ionic/core/dist/ionic/ionic.esm.js"></script>
+  <script nomodule src="https://cdn.jsdelivr.net/npm/@ionic/core/dist/ionic/ionic.js"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@ionic/core/css/ionic.bundle.css"/>
+ 
+  <!-- ViewerJS -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/viewerjs/1.10.0/viewer.css"/>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/viewerjs/1.10.0/viewer.js"></script>
+
+   <!-- ArcGIS -->
+  <link rel="stylesheet" href="https://js.arcgis.com/4.23/esri/themes/dark/main.css" />
+  <script src="https://js.arcgis.com/4.23/"></script>   
+
+  <style>
+    html, body, ion-app, ion-content, ion-split-pane, ion-menu, #viewDiv {
+      height: 100%;
+      width: 100%;
+      margin: 0;
+      padding: 0;
+    }
+
+    ion-toolbar {
+      --background: black;
+      --color: white;
+    }
+
+    #filters {
+      padding: 10px;
+    }
+
+    #viewDiv {
+      height: 100%;
+      width: 100%;
+    }
+
+    #image {
+      display: none;
+    }
+
+    .esri-popup__content img {
+      cursor: pointer;
+    }
+  </style>
+</head>
+
+<body>
+<ion-app>
+  <ion-header>
+    <ion-toolbar>
+      <ion-title>
+        <img src="husky.svg" width="40" height="40" style="vertical-align: middle;">
+        &nbsp; Index with Georeferenced Maps Example
+      </ion-title>
+    </ion-toolbar>
+  </ion-header>
+
+  <ion-content>
+    <ion-split-pane content-id="main">
+      <!-- Sidebar (Filters) -->
+      <ion-menu content-id="main" side="start" type="overlay" swipe-gesture="false">
+        <ion-header>
+          <ion-toolbar color="dark">
+            <ion-title>Filters</ion-title>
+          </ion-toolbar>
+        </ion-header>
+        <ion-content id="filters">
+          <!-- Ionic Searchbar -->
+          <ion-searchbar id="searchBar" placeholder="Search maps by keyword"></ion-searchbar>
+
+          <img id="image" src="" alt="Picture">
+
+          <ion-list>
+            <!-- Theme Selector -->
+            <ion-item>
+              <ion-label>Select a Theme</ion-label>
+              <ion-select id="theme" placeholder="Choose Theme">
+                <ion-select-option value="none">Choose Theme</ion-select-option>
+                <ion-select-option value="Fire Insurance Plans">Fire Insurance Plans</ion-select-option>
+                <ion-select-option value="Land Use">Land Use</ion-select-option>
+                <ion-select-option value="Mining Maps">Mining Maps</ion-select-option>
+                <ion-select-option value="Nautical">Nautical Charts</ion-select-option>
+                <ion-select-option value="Topographic">Topographic</ion-select-option>
+              </ion-select>
+            </ion-item>
+
+            <!-- Year Range -->
+            <ion-item>
+              <ion-label>Year Range</ion-label>
+            </ion-item>
+            <ion-item>
+              <ion-input id="startYear" type="number" placeholder="Start Year"></ion-input>
+              <ion-label>&nbsp; - &nbsp;</ion-label>
+              <ion-input id="endYear" type="number" placeholder="End Year"></ion-input>
+            </ion-item>
+
+            <!-- Opacity Slider -->
+            <ion-item>
+              <ion-label>Overlay Opacity</ion-label>
+            </ion-item>
+            <ion-item>
+              <ion-range id="slider" min="0" max="100" value="100" pin="true"></ion-range>
+            </ion-item>
+          </ion-list>
+
+          <!-- Results -->
+          <ion-list id="resultsDiv">
+            <ion-item>
+              <ion-label id="result-block">Results</ion-label>
+            </ion-item>
+            <ion-list id="result-list"></ion-list>
+          </ion-list>
+        </ion-content>
+      </ion-menu>
+
+      <!-- Map Content -->
+      <div class="ion-page" id="main">
+        <div id="viewDiv"></div>
+      </div>
+    </ion-split-pane>
+  </ion-content>
+</ion-app>
+
+<script>
+  require([
+    "esri/Map",
+    "esri/views/MapView",
+    "esri/layers/FeatureLayer",
+    "esri/layers/TileLayer",
+    "esri/layers/WebTileLayer",
+    "esri/widgets/Home"
+  ], (Map, MapView, FeatureLayer, TileLayer, WebTileLayer, Home) => (async () => {
+    
+    const renderer = {
+      type: "simple",
+      symbol: {
+        type: "simple-fill",
+        color: [255, 128, 0, 0],
+        outline: { width: 1, color: "black" }
+      }
+    };
+
+    const layer = new FeatureLayer({
+      url: "https://portal1-geo.sabu.mtu.edu/server/rest/services/Hosted/mapcatalog2selection_ExportFeaturesselection_ExportFeatures/FeatureServer/0",
+      outFields: ["*"],
+      renderer,
+      maxScale: 24,
+      minScale: 0
+    });
+
+    const map = new Map({
+      basemap: "streets-navigation-vector",
+      layers: [layer]
+    });
+
+    const view = new MapView({
+      container: "viewDiv",
+      map,
+      center: [-88.5694, 47.1211],
+      zoom: 7,
+      highlightOptions: {
+        color: [255,204,0],
+        haloOpacity: 1,
+        fillOpacity: 0
+      }
+    });
+
+    view.popup = {
+      dockEnabled: true,
+      dockOptions: { buttonEnabled: false, breakpoint: false }
+    };
+
+    view.ui.add(new Home({ view }), "top-left");
+    view.ui.move("zoom", "top-left");
+
+    const layerView = await view.whenLayerView(layer);
+
+    // Popup template
+    layer.popupTemplate = {
+      title: "<font color='#FC0'>{title}",
+      content: [
+        {
+          type: "media",
+          mediaInfos: [
+            { type: "image", value: { sourceURL: "https://portal1-geo.sabu.mtu.edu/images/historic_images/{filename}.jpg" } }
+          ]
+        },
+        {
+          type: "fields",
+          fieldInfos: [
+            { fieldName: "datapub", label: "Date" },
+            { fieldName: "publisher", label: "Publisher" },
+            { fieldName: "filename", label: "File Name" },
+            { fieldName: "digHold", label: "File Path" },
+            { fieldName: "theme", label: "Theme" },
+            { fieldName: "scale", label: "Scale" },
+            { fieldName: "source", label: "Source" },
+            { fieldName: "title", label: "Title" },
+            { fieldName: "portalUrl", label: "PortalUrl" },
+            { fieldName: "resolution", label: "Resolution (dpi)" }
+          ]
+        }
+      ]
+    };
+
+    let graphics = [];
+    let currentLayer = null;
+
+    async function getIonicValue(id) {
+  const el = document.getElementById(id);
+  await el.componentOnReady?.(); // wait for ion component init
+  return el.value;
+}
+
+async function filterItems(initial = false) {
+  const searchVal = (await getIonicValue("searchBar")) || "";
+  const themeVal = (await getIonicValue("theme")) || "none";
+  const startYearVal = (await getIonicValue("startYear")) || "";
+  const endYearVal = (await getIonicValue("endYear")) || "";
+
+  let searchStrings = [];
+  if (searchVal) {
+    searchStrings.push("(Upper(title) LIKE '%" + searchVal.toUpperCase() + 
+      "%' OR Upper(tags) LIKE '%" + searchVal.toUpperCase() + 
+      "%' OR datapub LIKE '%" + searchVal + "%')");
+  }
+  if (themeVal !== "none") {
+    searchStrings.push("theme = '" + themeVal + "'");
+  }
+  if (startYearVal && endYearVal) {
+    searchStrings.push("datapub BETWEEN '" + startYearVal + "' AND '" + endYearVal + "'");
+  }
+
+  let query = layer.createQuery();
+  query.returnGeometry = true;
+  if (!initial) query.geometry = view.extent;
+  query.where = searchStrings.length ? searchStrings.join(" AND ") : "1=1";
+
+  document.getElementById("result-list").innerHTML = "";
+  document.getElementById("result-block").innerText = "Results";
+
+  const results = await layer.queryFeatures(query);
+  graphics = results.features;
+
+  document.getElementById("result-block").innerText = "Results (" + graphics.length + ")";
+
+  graphics.forEach((result, index) => {
+    const item = document.createElement("ion-item");
+    item.innerHTML = `<ion-label>
+        <h2>${result.attributes.title}</h2>
+        <p>${result.attributes.datapub}</p>
+      </ion-label>`;
+    item.addEventListener("click", () => resultClickHandler(result, index));
+    document.getElementById("result-list").appendChild(item);
+  });
+
+  const objectIds = await layer.queryObjectIds(query);
+  layerView.filter = { objectIds };
+}
+
+    function resultClickHandler(result, index) {
+      const popup = graphics[parseInt(index, 10)];
+      if (!popup) return;
+
+      view.popup.open({ features: [popup], location: result.geometry.centroid });
+      view.goTo({ center: result.geometry.extent }, { duration: 400 });
+
+      if (currentLayer) {
+        map.remove(currentLayer);
+        currentLayer = null;
+      }
+
+      const currentMapUrl = result.attributes.service_url;
+      if (currentMapUrl.includes("{z}") && currentMapUrl.includes("{x}") && currentMapUrl.includes("{y}")) {
+        currentLayer = new WebTileLayer({ urlTemplate: currentMapUrl });
+      } else {
+        currentLayer = new TileLayer({ url: currentMapUrl });
+      }
+
+      map.add(currentLayer);
+      map.reorder(layer, 0);
+
+      const sliderVal = document.getElementById("slider").value;
+      currentLayer.opacity = sliderVal / 100;
+
+      updateViewer();
+    }
+
+    function updateViewer() {
+      const feature = view.popup.selectedFeature;
+      if (!feature) return;
+      document.getElementById("image").src = "https://portal1-geo.sabu.mtu.edu/images/historic_images/" + feature.attributes.filename + ".jpg";
+      document.getElementById("image").alt = feature.attributes.title;
+      viewer.update();
+    }
+
+    const viewer = new Viewer(document.getElementById("image"), { navbar: false, toolbar: true });
+
+    // Event bindings (Ionic)
+    document.getElementById("searchBar").addEventListener("ionInput", filterItems);
+    document.getElementById("theme").addEventListener("ionChange", filterItems);
+    document.getElementById("startYear").addEventListener("ionInput", filterItems);
+    document.getElementById("endYear").addEventListener("ionInput", filterItems);
+    document.getElementById("slider").addEventListener("ionInput", (ev) => {
+      if (currentLayer) currentLayer.opacity = ev.target.value / 100;
+    });
+
+    view.watch("load", (isLoaded) => { if (isLoaded) filterItems(); });
+    view.watch("stationary", (isStationary) => { if (isStationary) filterItems(); });
+
+    // Populate sidebar on page load
+    await view.when();
+    await layer.when();  
+
+    document.addEventListener("click", (e) => {
+      if (e.target.closest(".esri-popup__content img")) {
+        updateViewer();
+        viewer.show();
+      }
+    });
+
+
+
+  })());
+</script>
+</body>
+</html>
